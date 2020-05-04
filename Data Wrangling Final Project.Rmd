@@ -24,7 +24,6 @@ world_covid <- "https://www.worldometers.info/coronavirus/" %>% read_html() %>% 
 
 us_covid <- "https://www.worldometers.info/coronavirus/country/us/" %>% read_html() %>% html_table(fill = TRUE)
 
-
 hospital <- "https://www.ahd.com/state_statistics.html" %>% read_html() %>% html_table(fill = TRUE)
 
 elderly <- "https://www.prb.org/which-us-states-are-the-oldest/" %>% read_html() %>% html_table(fill = TRUE)
@@ -47,9 +46,10 @@ world_coviv19 <-world_coviv19[-c(1:7),] %>%
          Recovered = as.numeric(Recovered), 
          ActiveCases = as.numeric(ActiveCases), 
          Serious.Critical = as.numeric(Serious.Critical) ) %>%
+  mutate(Recovered = ifelse(is.na(Recovered)==TRUE, TotalCases-TotalDeaths-ActiveCases, Recovered)) %>%
   arrange(desc(TotalCases)) 
 
-world_coviv19 
+head(world_coviv19)
 
 ```
 
@@ -65,7 +65,7 @@ top10 <- world_coviv19[(2:11),] %>%
 
 top10
 ```
-  UK lacks data for recovered case. 
+
   
 ```{r}
 rates <- world_coviv19 %>% 
@@ -73,51 +73,55 @@ rates <- world_coviv19 %>%
   select(Country.Other, TotalCases, Serious.Critical, TotalDeaths) %>%
   mutate(death_rate = TotalDeaths/TotalCases, 
          critical_rate = (Serious.Critical + TotalDeaths)/TotalCases)
+
 rates
+
 critical.rate = as.numeric(rates[1,6])
 ```
 
-```{r}
+```{r, warning=FALSE}
 usa_covid19 = us_covid[2]
 
 usa_covid19 <- as.data.frame(usa_covid19) %>%
   rename(State = USAState) %>%
-  select(State, TotalCases, TotalDeaths) %>%
+  select(State, TotalCases, TotalDeaths, ActiveCases) %>%
   filter(!State %in% c("USA Total",  "Guam", "Northern Mariana Islands", "Puerto Rico", 
                           "United States Virgin Islands", "Veteran Affairs", "US Military", "Federal Prisons", 
                           "Navajo Nation", "Grand Princess Ship", "Wuhan Repatriated", "Diamond Princess Ship",
                           "Total:")) %>%
   mutate(TotalCases = str_replace_all(TotalCases, ",", ""),
-         TotalDeaths = str_replace_all(TotalDeaths, ",", "")) %>%
+         TotalDeaths = str_replace_all(TotalDeaths, ",", ""),
+         ActiveCases = str_replace_all(ActiveCases, ",", "")) %>%
   mutate(TotalCases = as.numeric(TotalCases),
          TotalDeaths = as.numeric(TotalDeaths),
+         ActiveCases = as.numeric(ActiveCases),
          CriticalCases = (TotalCases*critical.rate - TotalDeaths),
          CriticalCases = ifelse(CriticalCases<0, 0, CriticalCases),
          Death.rate = TotalDeaths/TotalCases,
          region = tolower(State))
 
-usa_covid19
-
+head(usa_covid19)
+  
 usa_covid19 %>% 
   dplyr::rename(value = TotalCases) %>% 
-  state_choropleth(title = "Total cases of Covid-19 in US by State",  num_colors = 9)
+  state_choropleth(title = "Total cases of Covid-19 in U.S. by State",  num_colors = 1)
 
 usa_covid19 %>% 
   dplyr::rename(value = Death.rate) %>% 
-  state_choropleth(title = "Death Rate of Covid-19 in US by State",  num_colors = 9)
+  state_choropleth(title = "Death Rate of Covid-19 in U.S. by State",  num_colors = 1)
 
-# Population need in hospital
+# Population need hospital services
 usa_covid19 %>% 
   dplyr::rename(value = CriticalCases) %>% 
-  state_choropleth(title = "Total Critical Cases of Covid19 in US by State",  num_colors = 9)
+  state_choropleth(title = "Total Critical Cases of Covid19 in U.S. by State",  num_colors = 1)
 ```
 
-```{r}
+```{r, warning=FALSE}
 hospital_stats = hospital[2]
 
 hospital_stats <- as.data.frame(hospital_stats)[-57,] %>%
-  separate(State, c("abb", "State"), sep = "- ") %>%
-  select(State, StaffedBeds, PatientDays) %>%
+  separate(State, c("State.abb", "State"), sep = "- ") %>%
+  select(State.abb, State, StaffedBeds, PatientDays) %>%
   filter(!State %in% c("American Samoa",  "Guam", "Northern Mariana Islands", "Puerto Rico", 
                           "Virgin Islands", "Veteran Affairs",  
                           "Navajo Nation")) %>%
@@ -128,7 +132,7 @@ hospital_stats <- as.data.frame(hospital_stats)[-57,] %>%
          spareBeds = StaffedBeds - (PatientDays/365), #apporx beds available 
          region = tolower(State))
 
-hospital_stats
+head(hospital_stats)
 
 hospital_stats %>% 
   rename(value = StaffedBeds) %>% 
@@ -138,6 +142,8 @@ hospital_stats %>%
   rename(value = spareBeds) %>% 
   state_choropleth(title = "Total Spare Beds in US by State",  num_colors = 1)
 
+
+
 ```
 
 ```{r}
@@ -145,62 +151,89 @@ elderly_pop = as.data.frame(elderly[1])
 names(elderly_pop) = c("Rank", "State", "TotalPop.k", "ElderlyPop.k", "Elderly.p")
 
 elderly_pop <- elderly_pop[-1,] %>%
-  select(State, TotalPop.k, ElderlyPop.k, Elderly.p) %>%
+  select(State, TotalPop.k, ElderlyPop.k) %>%
   mutate(TotalPop.k = str_replace_all(TotalPop.k, ",", ""), 
          ElderlyPop.k = str_replace_all(ElderlyPop.k, ",", "")) %>%
   mutate(TotalPop.k = as.numeric(TotalPop.k),
          ElderlyPop.k = as.numeric(ElderlyPop.k),
-         Elderly.p = as.numeric(Elderly.p)/100,
+         
          region = tolower(State)) 
 
-elderly_pop
+head(elderly_pop)
 
 elderly_pop %>%
   rename(value = ElderlyPop.k) %>% 
-  state_choropleth(title = "Elderly Population in US by State",  num_colors = 1)
+  state_choropleth(title = "Elderly Population in U.S. by State",  num_colors = 1)
 ```
 
-```{r}
+```{r, warning=FALSE}
 usa_data <- usa_covid19 %>%
   inner_join( hospital_stats, by = c("State", "region")) %>%
   inner_join(elderly_pop, by = c("State", "region")) %>%
   mutate(engoughBeds = ifelse(CriticalCases >= spareBeds, 0, 1),
          Infect.rate_k = TotalCases/(TotalPop.k)) %>%
-  arrange(desc(Infect.rate_k, TotalCases))
+  arrange(desc(TotalCases))
 
-usa_data
 
 usa_data %>%
   filter(engoughBeds == 0)
 #All the states have engough beds for Covid 19 patients. 
 
+usa_data %>%
+  arrange(desc(Infect.rate_k))
+
 usa_data %>% 
   dplyr::rename(value = Infect.rate_k) %>% 
-  state_choropleth(title = "Infected Rate of Covid19 in US by State",  num_colors = 9)
+  state_choropleth(title = "Infected Rate of Covid19 in U.S. by State",  num_colors = 1)
+
+usa_data %>%
+  mutate(State.abb = factor(State.abb, levels = rev(as.character(State.abb)))) %>%
+  ggplot( aes(x = "", y = TotalCases, fill = State.abb)) + 
+  geom_bar(width = 1, stat = "identity",color="white") +
+  coord_polar("y", start=0) +  theme(legend.position="none") +
+  geom_text(aes(label = State.abb, x =1.4), position = position_stack(vjust = 0.5), size = 5, check_overlap = TRUE) +
+  theme_minimal() + theme_void() + ggtitle("Portion of Total Cases of Covid 19 in U.S.") + 
+  theme(plot.title = element_text(hjust = 0.5))
+
+
+
 ```
+```{r}
+usa_data[1:20,] %>%
+  ggplot(aes(x = factor(as.character(State.abb), levels = unique(as.character(State.abb))), 
+             y = ActiveCases)) + geom_bar(stat = "identity", fill="steelblue") + ggtitle("Number of Active Cases in Top 20 States") + labs(x = "States") +ylab("Number of Active Cases")
+  
+
+
+```
+
 
 ```{r}
 # Poisson regression
-lm <- glm(TotalDeaths ~  StaffedBeds + TotalPop.k + ElderlyPop.k + Infect.rate_k, 
+lm <- glm(TotalDeaths ~  StaffedBeds  + ElderlyPop.k + Infect.rate_k, 
            data = usa_data, family = poisson(link="log"))
 summary(lm)
 
-lm2 <- glm(TotalDeaths ~  StaffedBeds + TotalPop.k + ElderlyPop.k + TotalCases, 
+lm2 <- glm(TotalDeaths ~  StaffedBeds + TotalPop.k + ElderlyPop.k + Infect.rate_k, 
            data = usa_data, family = poisson(link="log"))
 summary(lm2)
+
+
 ```
-   
+   lm2 has lower AIC.
   
 ```{r}
 deathlm <-function(df){
   glm(TotalDeaths ~  StaffedBeds + TotalPop.k + ElderlyPop.k + Infect.rate_k, 
            data = df, family = poisson(link="log"))
 }
+```
 
-sum(usa_data$TotalCases)/2
+```{r}
 
+# divide the data by the number of total cases and then run the Poisson regression
 lm_totalcase <- usa_data %>%
-  mutate(pandamic.center = ifelse(TotalCases >= 50000, 1, 0)) %>%
+  mutate(pandamic.center = ifelse(TotalCases >= 20000, 1, 0)) %>%
   select(State, TotalCases, TotalDeaths, Death.rate, Infect.rate_k, StaffedBeds, TotalPop.k, ElderlyPop.k, pandamic.center) %>%
   group_by(pandamic.center) %>%
   nest() %>%
@@ -218,8 +251,9 @@ summary(lm_totalcase[[3]][[2]])
 ```
 
 ```{r}
+# divide the data by the infected rate and then run the Poisson regression
 lm_infectrate <- usa_data %>%
-  mutate(pandamic.center = ifelse(Infect.rate_k >= 6, 1, 0)) %>%
+  mutate(pandamic.center = ifelse(Infect.rate_k >= 4, 1, 0)) %>%
   select(State, TotalCases, TotalDeaths, Death.rate, Infect.rate_k, StaffedBeds, TotalPop.k, ElderlyPop.k, pandamic.center) %>%
   group_by(pandamic.center) %>%
   nest() %>%
@@ -231,7 +265,7 @@ summary(lm_infectrate[[3]][[1]])
 summary(lm_infectrate[[3]][[2]])
 
 ```
-
+  Model that divide the data by the number of total cases and then run the Poisson regression performs better but it still confusing when interpreting the result. 
 ```{r}
 
 
