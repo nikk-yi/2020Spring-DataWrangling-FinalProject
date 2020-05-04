@@ -2,7 +2,10 @@
 
 Data visualization and analysis on Covid-19 and U.S. hospital and elderly population datasets. 
 
+
+
 Resources:
+
 World covid-19 stats: https://www.worldometers.info/coronavirus/
 
 US covid-19 stats: https://www.worldometers.info/coronavirus/country/us/
